@@ -90,6 +90,7 @@ export class AuthService {
 
   static isAuthenticated(): boolean {
     return !!localStorage.getItem('authToken') && !!this.getCurrentUser();
+  }
 
   static getUserType(): 'admin' | 'field-agent' | null {
     return localStorage.getItem('userType') as 'admin' | 'field-agent' | null;
