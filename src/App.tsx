@@ -74,6 +74,12 @@ function App() {
     setShowAdminLogin(false);
   };
 
+  const handleBackToLanding = () => {
+    setIsAuthenticated(false);
+    setCurrentUser(null);
+    setUserType(null);
+    setShowAdminLogin(false);
+  };
   const changeLanguage = (lng: string) => {
     i18n.changeLanguage(lng);
     localStorage.setItem('appLanguage', lng);
@@ -155,13 +161,18 @@ function App() {
                 {currentUser && (
                   <div className="text-sm text-gray-600">
                     <span>{t('welcome')}, </span>
-                    <span className="font-medium">{currentUser.name}</span>
+                    <span className="font-medium">
+                      {isAdmin ? currentUser.name : `${currentUser.name} (ID: ${currentUser.id.slice(-8)})`}
+                    </span>
                     <span className="ml-2 px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full">
                       {isAdmin ? 'Admin' : 'Field Agent'}
                     </span>
                   </div>
                 )}
 
+                <button onClick={handleBackToLanding} className="flex items-center space-x-2 px-4 py-2 text-gray-600 hover:text-gray-800 hover:bg-gray-50 rounded-lg transition-colors duration-200">
+                  <span>Back to Main</span>
+                </button>
                 <button onClick={handleLogout} className="flex items-center space-x-2 px-4 py-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-lg transition-colors duration-200">
                   <LogOut className="w-4 h-4" />
                   <span>{t('logout')}</span>
@@ -207,12 +218,17 @@ function App() {
                   {currentUser && (
                     <div className="px-3 py-2 text-sm text-gray-600">
                       <span>{t('welcome')}, </span>
-                      <span className="font-medium">{currentUser.name}</span>
+                      <span className="font-medium">
+                        {isAdmin ? currentUser.name : `${currentUser.name} (ID: ${currentUser.id.slice(-8)})`}
+                      </span>
                       <span className="ml-2 px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full">
                         {isAdmin ? 'Admin' : 'Field Agent'}
                       </span>
                     </div>
                   )}
+                  <button onClick={handleBackToLanding} className="w-full flex items-center space-x-2 px-3 py-2 text-gray-600 hover:text-gray-800 hover:bg-gray-50 rounded-md transition-colors duration-200">
+                    <span>Back to Main</span>
+                  </button>
                   <button onClick={handleLogout} className="w-full flex items-center space-x-2 px-3 py-2 text-red-600 hover:text-red-800 hover:bg-red-50 rounded-md transition-colors duration-200">
                     <LogOut className="w-4 h-4" />
                     <span>{t('logout')}</span>

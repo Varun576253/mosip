@@ -1,6 +1,6 @@
 // components/LandingPage.tsx
 import React from 'react';
-import { User, Shield, Database } from 'lucide-react';
+import { User, Shield, Database, Wifi, WifiOff } from 'lucide-react';
 
 interface LandingPageProps {
   onFieldAgentLogin: () => void;
@@ -8,9 +8,49 @@ interface LandingPageProps {
 }
 
 export function LandingPage({ onFieldAgentLogin, onAdminLogin }: LandingPageProps) {
+  const [isOnline, setIsOnline] = React.useState(navigator.onLine);
+
+  React.useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  const handleAdminLogin = () => {
+    if (!isOnline) {
+      alert('Admin login requires internet connection. Please connect to the internet and try again.');
+      return;
+    }
+    onAdminLogin();
+  };
+
+  const handleFieldAgentLogin = () => {
+    if (!isOnline) {
+      alert('Field agent login requires internet connection for authentication. You can work offline after logging in.');
+      return;
+    }
+    onFieldAgentLogin();
+  };
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
       <div className="max-w-4xl mx-auto">
+        {/* Connection Status */}
+        <div className="text-center mb-6">
+          <div className={`inline-flex items-center space-x-2 px-4 py-2 rounded-full text-sm ${
+            isOnline ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+          }`}>
+            {isOnline ? <Wifi className="w-4 h-4" /> : <WifiOff className="w-4 h-4" />}
+            <span>{isOnline ? 'Connected to Internet' : 'No Internet Connection'}</span>
+          </div>
+        </div>
+
         <div className="text-center mb-12">
           <div className="w-20 h-20 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-6">
             <Database className="w-10 h-10 text-white" />
@@ -38,7 +78,7 @@ export function LandingPage({ onFieldAgentLogin, onAdminLogin }: LandingPageProp
               </li>
               <li className="flex items-center text-sm text-gray-600">
                 <div className="w-2 h-2 bg-green-500 rounded-full mr-3"></div>
-                No login required for data collection
+                Login required for personalized records
               </li>
               <li className="flex items-center text-sm text-gray-600">
                 <div className="w-2 h-2 bg-green-500 rounded-full mr-3"></div>
@@ -50,11 +90,17 @@ export function LandingPage({ onFieldAgentLogin, onAdminLogin }: LandingPageProp
               </li>
             </ul>
             <button
-              onClick={onFieldAgentLogin}
-              className="w-full bg-gradient-to-r from-green-500 to-green-600 text-white py-4 px-6 rounded-lg font-semibold hover:from-green-600 hover:to-green-700 focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-all duration-200"
+              onClick={handleFieldAgentLogin}
+              disabled={!isOnline}
+              className="w-full bg-gradient-to-r from-green-500 to-green-600 text-white py-4 px-6 rounded-lg font-semibold hover:from-green-600 hover:to-green-700 focus:ring-2 focus:ring-green-500 focus:ring-offset-2 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Start as Field Agent
             </button>
+            {!isOnline && (
+              <p className="text-xs text-red-600 text-center mt-2">
+                Internet connection required for login
+              </p>
+            )}
           </div>
 
           {/* Admin Card */}
@@ -84,19 +130,18 @@ export function LandingPage({ onFieldAgentLogin, onAdminLogin }: LandingPageProp
                 System administration
               </li>
             </ul>
-            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
-              <p className="text-yellow-800 text-sm text-center">
-                <strong>Demo Credentials:</strong><br />
-                Username: <strong>admin</strong><br />
-                Password: <strong>admin123</strong>
-              </p>
-            </div>
             <button
-              onClick={onAdminLogin}
-              className="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white py-4 px-6 rounded-lg font-semibold hover:from-blue-600 hover:to-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200"
+              onClick={handleAdminLogin}
+              disabled={!isOnline}
+              className="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white py-4 px-6 rounded-lg font-semibold hover:from-blue-600 hover:to-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Login as Administrator
             </button>
+            {!isOnline && (
+              <p className="text-xs text-red-600 text-center mt-2">
+                Internet connection required for admin access
+              </p>
+            )}
           </div>
         </div>
 

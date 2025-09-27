@@ -31,6 +31,8 @@ export function ChildRecordForm({ onSaved }: ChildRecordFormProps) {
   const [saved, setSaved] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [bmiPreview, setBmiPreview] = useState<{ bmi: number; status: string } | null>(null);
+  const [manualLocation, setManualLocation] = useState({ latitude: '', longitude: '' });
+  const [useManualLocation, setUseManualLocation] = useState(false);
 
   // Calculate BMI preview when weight/height changes
   React.useEffect(() => {
@@ -58,6 +60,7 @@ export function ChildRecordForm({ onSaved }: ChildRecordFormProps) {
     navigator.geolocation.getCurrentPosition(
       (position) => {
         setLocation(position.coords);
+        setUseManualLocation(false);
       },
       (error) => {
         console.error('Error getting location:', error);
@@ -66,6 +69,31 @@ export function ChildRecordForm({ onSaved }: ChildRecordFormProps) {
     );
   };
 
+  const handleManualLocationSubmit = () => {
+    const lat = parseFloat(manualLocation.latitude);
+    const lng = parseFloat(manualLocation.longitude);
+    
+    if (isNaN(lat) || isNaN(lng)) {
+      alert('Please enter valid latitude and longitude values');
+      return;
+    }
+    
+    if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+      alert('Please enter valid coordinate ranges (Lat: -90 to 90, Lng: -180 to 180)');
+      return;
+    }
+    
+    setLocation({
+      latitude: lat,
+      longitude: lng,
+      accuracy: 0,
+      altitude: null,
+      altitudeAccuracy: null,
+      heading: null,
+      speed: null
+    });
+    setUseManualLocation(true);
+  };
   const handlePhotoCapture = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
@@ -229,6 +257,8 @@ export function ChildRecordForm({ onSaved }: ChildRecordFormProps) {
             <input
               type="text"
               id="childName"
+              autoComplete="off"
+              autoComplete="off"
               value={formData.childName}
               onChange={(e) => setFormData({ ...formData, childName: e.target.value })}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
@@ -396,7 +426,10 @@ export function ChildRecordForm({ onSaved }: ChildRecordFormProps) {
           <div className="flex items-center space-x-4">
             {location ? (
               <div className="flex-1 p-3 bg-green-50 border border-green-200 rounded-lg">
-                <p className="text-sm text-green-800">📍 {t('locationCaptured', { lat: location.latitude.toFixed(6), lng: location.longitude.toFixed(6) })}</p>
+                <p className="text-sm text-green-800">
+                  📍 {t('locationCaptured', { lat: location.latitude.toFixed(6), lng: location.longitude.toFixed(6) })}
+                  {useManualLocation && <span className="ml-2 text-xs">(Manual)</span>}
+                </p>
               </div>
             ) : (
               <div className="flex-1 p-3 bg-gray-50 border border-gray-200 rounded-lg">
@@ -409,6 +442,42 @@ export function ChildRecordForm({ onSaved }: ChildRecordFormProps) {
               <span>{t('getLocation')}</span>
             </button>
           </div>
+          
+          {/* Manual Location Entry */}
+          <div className="mt-4 p-4 bg-gray-50 border border-gray-200 rounded-lg">
+            <h4 className="text-sm font-medium text-gray-700 mb-3">Enter Location Manually</h4>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Latitude</label>
+                <input
+                  type="number"
+                  step="any"
+                  value={manualLocation.latitude}
+                  onChange={(e) => setManualLocation({ ...manualLocation, latitude: e.target.value })}
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  placeholder="e.g., 12.9716"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Longitude</label>
+                <input
+                  type="number"
+                  step="any"
+                  value={manualLocation.longitude}
+                  onChange={(e) => setManualLocation({ ...manualLocation, longitude: e.target.value })}
+                  className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  placeholder="e.g., 77.5946"
+                />
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={handleManualLocationSubmit}
+              className="mt-3 px-4 py-2 bg-gray-600 text-white text-sm rounded-lg hover:bg-gray-700"
+            >
+              Set Manual Location
+            </button>
+          </div>
         </div>
 
         {/* Parental Consent */}
@@ -417,6 +486,7 @@ export function ChildRecordForm({ onSaved }: ChildRecordFormProps) {
             <input
               type="checkbox"
               id="parentalConsent"
+              autoComplete="off"
               checked={formData.parentalConsent}
               onChange={(e) => setFormData({ ...formData, parentalConsent: e.target.checked })}
               className="mt-1 w-5 h-5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"

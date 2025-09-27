@@ -16,7 +16,29 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 // In-memory storage for demo (use database in production)
 let childRecords = [];
 let uploadedFiles = new Map();
+let activeFieldAgents = new Map(); // Track active field agents
 
+// Middleware to track field agent activity
+const trackFieldAgent = (req, res, next) => {
+  const authToken = req.headers.authorization?.replace('Bearer ', '');
+  if (authToken && authToken !== 'admin_token') {
+    const agentId = authToken.replace('token_', '');
+    activeFieldAgents.set(agentId, {
+      id: agentId,
+      lastActive: new Date(),
+      isOnline: true
+    });
+    
+    // Clean up inactive agents (older than 5 minutes)
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+    for (const [id, agent] of activeFieldAgents.entries()) {
+      if (agent.lastActive < fiveMinutesAgo) {
+        activeFieldAgents.delete(id);
+      }
+    }
+  }
+  next();
+};
 // Storage configuration for file uploads
 const storage = multer.memoryStorage();
 const upload = multer({ storage });
@@ -27,7 +49,7 @@ app.get('/api/health', (req, res) => {
 });
 
 // Upload child record
-app.post('/api/child-records', (req, res) => {
+app.post('/api/child-records', trackFieldAgent, (req, res) => {
   try {
     const record = req.body;
     
@@ -55,7 +77,7 @@ app.post('/api/child-records', (req, res) => {
 });
 
 // Get all child records
-app.get('/api/child-records', (req, res) => {
+app.get('/api/child-records', trackFieldAgent, (req, res) => {
   try {
     // In production, implement proper authentication and filtering
     res.json(childRecords);
@@ -65,6 +87,20 @@ app.get('/api/child-records', (req, res) => {
   }
 });
 
+// Get active field agents
+app.get('/api/field-agents', (req, res) => {
+  try {
+    const agents = Array.from(activeFieldAgents.values()).map(agent => ({
+      ...agent,
+      name: `Field Agent ${agent.id.slice(-4)}`,
+      recordCount: childRecords.filter(r => r.representativeId === agent.id).length
+    }));
+    res.json(agents);
+  } catch (error) {
+    console.error('Field agents fetch error:', error);
+    res.status(500).json({ error: 'Failed to fetch field agents' });
+  }
+});
 // Get child record by Health ID
 app.get('/api/child-records/:healthId', (req, res) => {
   try {
@@ -130,12 +166,7 @@ app.get('/api/statistics', (req, res) => {
       uploadedRecords,
       pendingRecords,
       malnutritionCases,
-      regions: [
-        { name: 'North', count: Math.floor(totalRecords * 0.3) },
-        { name: 'South', count: Math.floor(totalRecords * 0.25) },
-        { name: 'East', count: Math.floor(totalRecords * 0.25) },
-        { name: 'West', count: Math.floor(totalRecords * 0.2) }
-      ]
+      activeFieldAgents: activeFieldAgents.size
     });
   } catch (error) {
     console.error('Statistics error:', error);

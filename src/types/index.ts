@@ -28,7 +28,6 @@ export interface Representative {
   name: string;
   email: string;
   phone: string;
-  region: string;
   isAuthenticated: boolean;
 }
 
@@ -43,7 +42,6 @@ export interface AdminStats {
   malnutritionCases: number;
   pendingUploads: number;
   activeRepresentatives: number;
-  regionStats: Array<{ region: string; count: number; malnutritionRate: number }>;
   moderateCases?: number;
   severeCases?: number;
   normalCases?: number;

@@ -39,11 +39,21 @@ export class SyncService {
   static async syncPendingRecords(): Promise<void> {
     if (!this.isOnline || this.syncInProgress) return;
 
+    // Check if user is authenticated for sync
+    const authToken = localStorage.getItem('authToken');
+    if (!authToken) {
+      console.log('No auth token available for sync');
+      return;
+    }
     this.syncInProgress = true;
     
     try {
       const records = await db.getChildRecords();
-      const pendingRecords = records.filter(r => !r.isUploaded);
+      const currentUser = AuthService.getCurrentUser();
+      const pendingRecords = records.filter(r => 
+        !r.isUploaded && 
+        (currentUser?.id === 'admin_001' || r.representativeId === currentUser?.id)
+      );
       let successCount = 0;
       let failedRecords: ChildRecord[] = [];
       
@@ -126,7 +136,11 @@ export class SyncService {
 
   static async getPendingRecordsCount(): Promise<number> {
     const records = await db.getChildRecords();
-    return records.filter(r => !r.isUploaded).length;
+    const currentUser = AuthService.getCurrentUser();
+    return records.filter(r => 
+      !r.isUploaded && 
+      (currentUser?.id === 'admin_001' || r.representativeId === currentUser?.id)
+    ).length;
   }
 
   static async retryFailedUploads(): Promise<void> {

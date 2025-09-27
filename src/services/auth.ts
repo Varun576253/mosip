@@ -7,6 +7,10 @@ export class AuthService {
 
   static async authenticateWithESignet(nationalId: string, otp: string): Promise<Representative> {
     // Mock eSignet authentication
+    if (!navigator.onLine) {
+      throw new Error('Internet connection required for authentication');
+    }
+    
     await new Promise(resolve => setTimeout(resolve, 2000));
     
     if (otp !== '123456') {
@@ -21,10 +25,9 @@ export class AuthService {
       const mockRep: Representative = {
         id: `rep_${Date.now()}`,
         nationalId,
-        name: `Field Representative ${nationalId}`,
+        name: `Field Agent ${nationalId}`,
         email: `rep_${nationalId}@health.org`,
         phone: '+1234567890',
-        region: 'North Region',
         isAuthenticated: true,
       };
       await db.saveRepresentative(mockRep);
@@ -39,6 +42,10 @@ export class AuthService {
   }
 
   static async authenticateAdmin(username: string, password: string): Promise<boolean> {
+    if (!navigator.onLine) {
+      throw new Error('Internet connection required for admin authentication');
+    }
+    
     await new Promise(resolve => setTimeout(resolve, 1000));
     
     if (username === 'admin' && password === 'admin123') {
@@ -83,7 +90,6 @@ export class AuthService {
 
   static isAuthenticated(): boolean {
     return !!localStorage.getItem('authToken') && !!this.getCurrentUser();
-  }
 
   static getUserType(): 'admin' | 'field-agent' | null {
     return localStorage.getItem('userType') as 'admin' | 'field-agent' | null;
@@ -99,13 +105,16 @@ export class AuthService {
   }
 
   static async loginAsFieldAgent(): Promise<void> {
+    if (!navigator.onLine) {
+      throw new Error('Internet connection required for field agent login');
+    }
+    
     const fieldAgent: Representative = {
       id: 'field_agent_001',
       nationalId: 'field_agent',
       name: 'Field Agent (Offline Mode)',
       email: 'fieldagent@health.org',
       phone: '+1234567890',
-      region: 'Local Region',
       isAuthenticated: true,
     };
     
@@ -116,6 +125,10 @@ export class AuthService {
   }
 
   static isFieldAgentAuthenticated(): boolean {
+    if (!navigator.onLine) {
+      throw new Error('Internet connection required to send OTP');
+    }
+    
     return this.getUserType() === 'field-agent' && this.isAuthenticated();
   }
 

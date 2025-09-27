@@ -20,9 +20,16 @@ export function RecordsList() {
   const [syncing, setSyncing] = useState(false);
   const [showAuthForSync, setShowAuthForSync] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState(SyncService.getConnectionStatus());
+  const [showLoginModal, setShowLoginModal] = useState(false);
 
   useEffect(() => {
     loadRecords();
+    
+    // Set default filter to pending for field agents
+    const userType = AuthService.getUserType();
+    if (userType === 'field-agent') {
+      setFilterStatus('pending');
+    }
     
     // Listen for sync events
     const handleSyncComplete = () => {
@@ -101,6 +108,19 @@ export function RecordsList() {
     setShowAuthForSync(false);
   };
 
+  const handleLogin = () => {
+    setShowLoginModal(true);
+  };
+
+  const handleLoginSuccess = () => {
+    setShowLoginModal(false);
+    loadRecords(); // Reload records after login
+  };
+
+  const handleLogout = async () => {
+    await AuthService.logout();
+    window.location.reload(); // Refresh to go back to landing page
+  };
   const handleDownloadPDF = async (record: ChildRecord) => {
     try {
       await PDFService.downloadHealthBooklet(record);
@@ -131,6 +151,9 @@ export function RecordsList() {
     return <AuthPage onAuthSuccess={handleAuthSuccess} onCancel={handleAuthCancel} />;
   }
 
+  if (showLoginModal) {
+    return <AuthPage onAuthSuccess={handleLoginSuccess} />;
+  }
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -153,6 +176,21 @@ export function RecordsList() {
         </div>
         
         <div className="flex items-center space-x-3">
+          {/* Login/Logout Buttons */}
+          <button
+            onClick={handleLogin}
+            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center space-x-2"
+          >
+            <span>Login</span>
+          </button>
+          
+          <button
+            onClick={handleLogout}
+            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 flex items-center space-x-2"
+          >
+            <span>Logout</span>
+          </button>
+
           {/* Connection Status Indicator */}
           <div className={`flex items-center space-x-2 px-3 py-1 rounded-full text-sm ${
             connectionStatus.isOnline 
@@ -272,6 +310,7 @@ export function RecordsList() {
                     <div className="flex-1 min-w-0">
                       <h3 className="font-semibold text-gray-900 truncate">{record.childName}</h3>
                       <p className="text-sm text-gray-600">{record.age} {t('age')}</p>
+                      <p className="text-sm text-gray-500">{record.parentGuardianName}</p>
                     </div>
                   </div>
                 </div>
@@ -298,7 +337,12 @@ export function RecordsList() {
                   </div>
                   <div className="flex items-center text-sm text-gray-600">
                     <MapPin className="w-3 h-3 mr-1" />
-                    <span className="truncate">{record.address}</span>
+                    <span className="truncate">
+                      {record.location ? 
+                        `${record.location.latitude.toFixed(4)}, ${record.location.longitude.toFixed(4)}` : 
+                        'No location'
+                      }
+                    </span>
                   </div>
                 </div>
 
@@ -352,10 +396,6 @@ export function RecordsList() {
                       <label className="text-sm font-medium text-gray-600">{t('parentGuardianName')}</label>
                       <p className="text-gray-900">{selectedRecord.parentGuardianName}</p>
                     </div>
-                    <div>
-                      <label className="text-sm font-medium text-gray-600">{t('contactNumber')}</label>
-                      <p className="text-gray-900">{selectedRecord.contactNumber}</p>
-                    </div>
                   </div>
                 </div>
                 
@@ -364,10 +404,6 @@ export function RecordsList() {
                     <div>
                       <label className="text-sm font-medium text-gray-600">{t('age')}</label>
                       <p className="text-lg font-semibold text-gray-900">{selectedRecord.age}</p>
-                    </div>
-                    <div>
-                      <label className="text-sm font-medium text-gray-600">{t('gender')}</label>
-                      <p className="text-lg font-semibold text-gray-900">{selectedRecord.gender}</p>
                     </div>
                   </div>
                   
@@ -383,8 +419,13 @@ export function RecordsList() {
                   </div>
                   
                   <div>
-                    <label className="text-sm font-medium text-gray-600">{t('address')}</label>
-                    <p className="text-gray-900">{selectedRecord.address}</p>
+                    <label className="text-sm font-medium text-gray-600">Location</label>
+                    <p className="text-gray-900">
+                      {selectedRecord.location ? 
+                        `${selectedRecord.location.latitude.toFixed(6)}, ${selectedRecord.location.longitude.toFixed(6)}` : 
+                        'No location captured'
+                      }
+                    </p>
                   </div>
                   
                   <div>

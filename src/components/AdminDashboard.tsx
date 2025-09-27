@@ -21,12 +21,31 @@ export function AdminDashboard() {
   const [searchHealthId, setSearchHealthId] = useState('');
   const [dateFilter, setDateFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [regionFilter, setRegionFilter] = useState('all');
+  const [nationalIdFilter, setNationalIdFilter] = useState('');
+  const [fieldAgents, setFieldAgents] = useState<any[]>([]);
 
   useEffect(() => {
     loadDashboardData();
+    loadFieldAgents();
   }, []);
 
+  const loadFieldAgents = async () => {
+    try {
+      // In a real implementation, this would fetch from API
+      // For now, we'll get unique representative IDs from records
+      const allRecords = await db.getChildRecords();
+      const uniqueReps = Array.from(new Set(allRecords.map(r => r.representativeId)));
+      const agents = uniqueReps.map(id => ({
+        id,
+        name: `Field Agent ${id.slice(-4)}`,
+        isOnline: Math.random() > 0.3, // Mock online status
+        recordCount: allRecords.filter(r => r.representativeId === id).length
+      }));
+      setFieldAgents(agents);
+    } catch (error) {
+      console.error('Failed to load field agents:', error);
+    }
+  };
   const loadDashboardData = async () => {
     try {
       const allRecords = await db.getChildRecords();
@@ -46,19 +65,11 @@ export function AdminDashboard() {
       const malnutritionCases = moderateCases + severeCases;
       const pendingUploads = allRecords.filter(r => !r.isUploaded).length;
 
-      const regionStats = [
-        { region: 'North Region', count: Math.floor(totalChildren * 0.3), malnutritionRate: 0.15 },
-        { region: 'South Region', count: Math.floor(totalChildren * 0.25), malnutritionRate: 0.12 },
-        { region: 'East Region', count: Math.floor(totalChildren * 0.25), malnutritionRate: 0.18 },
-        { region: 'West Region', count: Math.floor(totalChildren * 0.2), malnutritionRate: 0.10 },
-      ];
-
       setStats({
         totalChildren,
         malnutritionCases,
         pendingUploads,
-        activeRepresentatives: 5,
-        regionStats,
+        activeRepresentatives: fieldAgents.filter(a => a.isOnline).length,
         moderateCases,
         severeCases,
         normalCases
@@ -108,8 +119,55 @@ export function AdminDashboard() {
       }
     }
 
+    // National ID filter
+    if (nationalIdFilter.trim()) {
+      filtered = filtered.filter(record => 
+        record.representativeId.toLowerCase().includes(nationalIdFilter.toLowerCase())
+      );
+    }
     return filtered;
   };
+
+  // Get filtered data for charts
+  const getFilteredDataForCharts = () => {
+    const filteredRecords = getFilteredRecords();
+    
+    let normalCases = 0, moderateCases = 0, severeCases = 0;
+    filteredRecords.forEach(record => {
+      const bmi = calculateBMI(record.childWeight, record.childHeight);
+      const status = getMalnutritionStatus(bmi, record.age);
+      if (status === 'Normal') normalCases++;
+      if (status === 'Moderate Acute Malnutrition') moderateCases++;
+      if (status === 'Severe Acute Malnutrition') severeCases++;
+    });
+
+    const ageGroups = filteredRecords.reduce((acc, record) => {
+      const ageGroup = record.age < 1 ? '0-1' :
+        record.age < 3 ? '1-3' :
+        record.age < 5 ? '3-5' :
+        record.age < 10 ? '5-10' : '10+';
+      acc[ageGroup] = (acc[ageGroup] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+
+    const ageGroupData = Object.entries(ageGroups).map(([group, count]) => ({
+      age: group,
+      count,
+    }));
+
+    const AGE_ORDER = ['0-1', '1-3', '3-5', '5-10', '10+'];
+    ageGroupData.sort((a, b) => AGE_ORDER.indexOf(a.age) - AGE_ORDER.indexOf(b.age));
+
+    return {
+      malnutritionData: [
+        { name: t('statusGood'), value: normalCases },
+        { name: t('statusModerate'), value: moderateCases },
+        { name: t('statusHighRisk'), value: severeCases },
+      ],
+      ageGroupData
+    };
+  };
+
   const handleSearchAndDownload = async () => {
     if (!searchHealthId.trim()) {
       alert(t('alerts.enterHealthId'));
@@ -144,28 +202,7 @@ export function AdminDashboard() {
     );
   }
 
-  const malnutritionData = [
-    { name: t('statusGood'), value: stats.normalCases || 0 },
-    { name: t('statusModerate'), value: stats.moderateCases || 0 },
-    { name: t('statusHighRisk'), value: stats.severeCases || 0 },
-  ];
-
-  const ageGroups = records.reduce((acc, record) => {
-    const ageGroup = record.age < 1 ? '0-1' :
-      record.age < 3 ? '1-3' :
-      record.age < 5 ? '3-5' :
-      record.age < 10 ? '5-10' : '10+';
-    acc[ageGroup] = (acc[ageGroup] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
-
-  const ageGroupData = Object.entries(ageGroups).map(([group, count]) => ({
-    age: group,
-    count,
-  }));
-
-  const AGE_ORDER = ['0-1', '1-3', '3-5', '5-10', '10+'];
-  ageGroupData.sort((a, b) => AGE_ORDER.indexOf(a.age) - AGE_ORDER.indexOf(b.age));
+  const { malnutritionData, ageGroupData } = getFilteredDataForCharts();
 
   // Trend data for the last 7 days
   const trendData = Array.from({ length: 7 }, (_, i) => {
@@ -317,17 +354,18 @@ export function AdminDashboard() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Region</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Field Agent ID</label>
             <select
-              value={regionFilter}
-              onChange={(e) => setRegionFilter(e.target.value)}
+              value={nationalIdFilter}
+              onChange={(e) => setNationalIdFilter(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
             >
-              <option value="all">All Regions</option>
-              <option value="north">North Region</option>
-              <option value="south">South Region</option>
-              <option value="east">East Region</option>
-              <option value="west">West Region</option>
+              <option value="">All Field Agents</option>
+              {fieldAgents.map(agent => (
+                <option key={agent.id} value={agent.id}>
+                  {agent.name} ({agent.recordCount} records)
+                </option>
+              ))}
             </select>
           </div>
 
@@ -336,7 +374,7 @@ export function AdminDashboard() {
               onClick={() => {
                 setDateFilter('all');
                 setStatusFilter('all');
-                setRegionFilter('all');
+                setNationalIdFilter('');
               }}
               className="w-full px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors"
             >
@@ -350,6 +388,26 @@ export function AdminDashboard() {
         </div>
       </div>
 
+      {/* Field Agents Status */}
+      <div className="bg-white rounded-xl shadow-lg p-6">
+        <h3 className="text-xl font-bold text-gray-900 mb-4">Active Field Agents</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {fieldAgents.map(agent => (
+            <div key={agent.id} className="p-4 border border-gray-200 rounded-lg">
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="font-medium text-gray-900">{agent.name}</h4>
+                <span className={`px-2 py-1 text-xs rounded-full ${
+                  agent.isOnline ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                }`}>
+                  {agent.isOnline ? 'Online' : 'Offline'}
+                </span>
+              </div>
+              <p className="text-sm text-gray-600">Records: {agent.recordCount}</p>
+              <p className="text-xs text-gray-500">ID: {agent.id}</p>
+            </div>
+          ))}
+        </div>
+      </div>
       {/* Charts */}
       <div className="grid lg:grid-cols-3 gap-8">
         <div className="bg-white rounded-xl shadow-lg p-6">
@@ -417,10 +475,12 @@ export function AdminDashboard() {
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">{t('childName')}</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">{t('healthIdLabel')}</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Parent/Guardian</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">{t('age')}</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">BMI</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">{t('statusLabel')}</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">{t('createdLabel')}</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Field Agent</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">Upload</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500">{t('actions')}</th>
               </tr>
@@ -433,6 +493,7 @@ export function AdminDashboard() {
                   <tr key={record.id}>
                     <td className="px-6 py-4">{record.childName}</td>
                     <td className="px-6 py-4 font-mono text-indigo-600">{record.healthId}</td>
+                    <td className="px-6 py-4">{record.parentGuardianName}</td>
                     <td className="px-6 py-4">{record.age}</td>
                     <td className="px-6 py-4 font-semibold">{bmi.toFixed(1)}</td>
                     <td className="px-6 py-4">
@@ -445,6 +506,7 @@ export function AdminDashboard() {
                       </span>
                     </td>
                     <td className="px-6 py-4">{new Date(record.createdAt).toLocaleDateString()}</td>
+                    <td className="px-6 py-4 text-xs text-gray-500">{record.representativeId.slice(-8)}</td>
                     <td className="px-6 py-4">
                       <span className={`px-2 py-1 text-xs rounded-full ${
                         record.isUploaded ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
